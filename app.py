@@ -72,4 +72,4 @@ def convert_df(df):
 
 csv = convert_df(df)
 
-st.download_button(label="Download Results", data=csv, file_name='links.csv', mime='text/csv')
+st.download_button(label="Download Results", data=csv, file_name='social_links.csv', mime='text/csv')
