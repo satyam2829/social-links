@@ -8,7 +8,8 @@ from stqdm import stqdm
 df = pd.DataFrame(columns=["ID", "Website", "LinkedIn", "Facebook", "Twitter", "Instagram", "Youtube", "ProductHunt", 
                             "Github", "StatusCode"])
 
-st.title("Web App to generate social media links")
+
+st.header("Web App to generate social media links")
 
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
