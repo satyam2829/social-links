@@ -12,8 +12,10 @@ uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
     data = pd.read_csv(uploaded_file)
 
+    rows = st.number_input("Enter no. of websites", min_value=5, max_value=1000)
+
     ids = data["ID"]
-    website = data["Website"].head(50)
+    website = data["Website"].head(rows)
 
     for i in stqdm(range(len(website))):
 
