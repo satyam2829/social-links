@@ -7,6 +7,7 @@ from basemodel import URL
 from fastapi.params import Body
 import requests
 from bs4 import BeautifulSoup
+import re
 
 app = FastAPI()
 
@@ -24,7 +25,13 @@ def get_social_media_links(data:URL):
     youtube_url = None
     producthunt_url = None
     github_url = None
+    whatsapp_url = None
     status_code = None
+    cin = list()
+    gstin = list()
+    email = list()
+    phones = list()
+    fssai = list()
 
     webpage = requests.get(data["url"], timeout=15)
     soup = BeautifulSoup(webpage.content, "html.parser")
@@ -53,6 +60,24 @@ def get_social_media_links(data:URL):
         if "github.com" in link:
             github_url = link
 
+        if "wa.me/" in link:
+            whatsapp_url = link
+
+        cin_regex = r"([A-Z]{1}\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})"
+        cin = list(set(re.findall(cin_regex, webpage.text)))
+
+        gst_regex = r"(\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d{1}[A-Z]{2})"
+        gstin = list(set(re.findall(gst_regex, webpage.text)))
+
+        email_regex = r"[\w\.-]+@[\w\.-]+"
+        email = list(set(re.findall(email_regex, webpage.text)))
+
+        phone_regex = r"\+91?\d[\d -]{8,12}\d"
+        phones = list(set(re.findall(phone_regex, webpage.text)))
+
+        fssai_regex = r"(\d{14})"
+        fssai = list(set(re.findall(fssai_regex, webpage.text)))
+
     data = {
         "Website": data["url"],
         "Facebook": facebook_url,
@@ -60,27 +85,15 @@ def get_social_media_links(data:URL):
         "LinkedIn": linkedin_url,
         "Instagram": instagram_url,
         "Youtube": youtube_url,
+        "Whatsapp": whatsapp_url,
         "ProductHunt": producthunt_url,
         "GitHub": github_url,
+        "CIN": cin,
+        "GSTIN": gstin,
+        "Email": email,
+        "Phone": phones,
+        "Fssai" : fssai,
         "Status Code": webpage.status_code
     }
 
     return data
-
-# @app.post("/uploadfile/")
-# async def create_upload_file(file: UploadFile):
-#     return {"filename": file.filename}
-
-# @app.post("/files/")
-# async def create_file(file: bytes = File(...)):
-#     return {"file_size": len(file)}
-
-@app.post("/uploadfile")
-def read_csv(data_file: UploadFile):
-    
-    df = pd.read_excel(StringIO(str(data_file.file.read())), engine='openpyxl')
-    stream = StringIO()
-    df.to_csv(stream, index = False)
-    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
-    response.headers["Content-Disposition"] = "attachment; filename=export.csv"
-    return response
