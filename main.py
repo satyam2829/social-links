@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from io import StringIO
 import uvicorn
 import pandas as pd
-from basemodel import URL
+from basemodel import URL, NAME
 from fastapi.params import Body
 import requests
 from bs4 import BeautifulSoup
@@ -78,7 +78,7 @@ def get_social_media_links(data:URL):
         fssai_regex = r"(\d{14})"
         fssai = list(set(re.findall(fssai_regex, webpage.text)))
 
-    data = {
+    links = {
         "Website": data["url"],
         "Facebook": facebook_url,
         "Twitter": twitter_url,
@@ -96,4 +96,36 @@ def get_social_media_links(data:URL):
         "Status Code": webpage.status_code
     }
 
-    return data
+    return links
+
+@app.post("/google-ratings-and-reviews")
+def get_google_ratings_and_reviews(data: NAME):
+    data = data.dict()
+    ratings = None
+    votes = None
+
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36"}
+
+    search_url = "https://www.google.com/search?q="
+    url = search_url + data["name"]
+
+    webpage = requests.get(url, headers=headers)
+    soup = BeautifulSoup(webpage.content, "html.parser")
+
+    rating_element = soup.find("span", class_ = "Aq14fc")
+    if rating_element is not None:
+        ratings = rating_element.text
+
+    votes_element = soup.find("span", class_ = "hqzQac")
+    if votes_element is not None:
+        votes = votes_element.a.span.text
+        votes = votes.split(" ")[0]
+
+    google_business_data = {
+        "Company": data["name"],
+        "Ratings": ratings,
+        "Reviews": votes,
+        "Status": webpage.status_code
+    }
+
+    return google_business_data
