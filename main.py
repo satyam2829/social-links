@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from io import StringIO
 import uvicorn
 import pandas as pd
-from basemodel import URL, NAME
+from basemodel import URL, NAME, TRADEMARK
 from fastapi.params import Body
 import requests
 from bs4 import BeautifulSoup
@@ -129,3 +129,98 @@ def get_google_ratings_and_reviews(data: NAME):
     }
 
     return google_business_data
+
+@app.post("/trademark-details")
+def get_trademark_details(data: TRADEMARK):
+    data = data.dict()
+    
+    company_name = data["company_name"]
+    cin = data["company_cin"]
+
+    zaubacorp_url = "https://www.zaubacorp.com/company-trademark/"
+    url =  zaubacorp_url + data["company_name"] + "/" + data["company_cin"]
+
+    trademark_data = dict()
+    records = None
+    trademark_details = list()
+    total_pages = None
+    name_and_class = list()
+    trademark_date = list()
+    trademark_status = list()
+
+    headers = {
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15'}
+
+    company_trademark_page = requests.get(url, headers=headers)
+    soup = BeautifulSoup(company_trademark_page.content, "html.parser")
+
+    details = soup.find("div", class_="container basic-cont")
+    total_records = details.find("div", class_="col-xs-4 text-left")
+    if total_records is not None:
+        records = total_records.text
+        records = " ".join(records.split())
+        if "," in records:
+            records = records.replace(",", "")
+        records = int(re.findall("\d+", records)[0])
+
+        if records % 10 == 0:
+            total_pages = records // 10
+        else:
+            total_pages = (records // 10) + 1
+
+        for page in range(1, total_pages + 1):
+            trademark_details_list = list()
+            new_url = zaubacorp_url + data["company_name"] + "/" + data["company_cin"] + "/page-" + str(page)
+
+            new_trademark_page = requests.get(new_url, headers=headers)
+            new_soup = BeautifulSoup(
+            new_trademark_page.content, "html.parser")
+
+            trademark_name_and_class = new_soup.find_all("span", class_="wordMark")
+            for trademark in trademark_name_and_class:
+                name = trademark.text
+                name = name.replace("\xa0", "")
+                name = name.replace("Class : ", "")
+                name = name.replace("Trademark : ", "")
+                name_and_class.append(name)
+
+            trademark_name = list(
+                [name_and_class[i] for i in range(len(name_and_class)) if i % 3 == 0])
+            trademark_class = list(
+                [int(ele) for ele in name_and_class if ele not in trademark_name])
+            trademark_class = [trademark_class[i]
+                                for i in range(len(trademark_class)) if i % 2 == 0]
+
+            card = new_soup.find_all("div", class_="left-wrapper")
+            for data in card:
+                trademark_card = data.text.splitlines()
+                trademark_card = [i for i in trademark_card if i]
+                trademark_date.append(trademark_card[0])
+                trademark_status.append(trademark_card[1])
+
+                trademark_date = [sub.replace("\xa0", "")
+                                  for sub in trademark_date]
+                trademark_status = [sub.replace(
+                    "\xa0", "") for sub in trademark_status]
+
+                labels = ["name", "class", "date", "status"]
+
+            for l in range(len(trademark_name)):
+                trademark_data_dict = dict()
+                trademark_data_dict.update({
+                    "name": trademark_name[l],
+                    "class": trademark_class[l],
+                    "date": trademark_date[l][19:],
+                    "status": trademark_status[l][9:]
+                })
+
+                trademark_details.append(trademark_data_dict)
+
+        trademark_data.update({
+                "Company": company_name,
+                "CIN": cin,
+                "records": records,
+                "trademark_details": trademark_details
+            })
+
+    return trademark_data

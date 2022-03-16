@@ -5,3 +5,8 @@ class URL(BaseModel):
 
 class NAME(BaseModel):
     name: str
+
+
+class TRADEMARK(BaseModel):
+    company_name: str
+    company_cin: str
