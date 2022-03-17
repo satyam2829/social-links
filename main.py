@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from io import StringIO
 import uvicorn
 import pandas as pd
-from basemodel import URL, NAME, TRADEMARK
+from basemodel import URL, NAME, TRADEMARK, APPSTORE, PLAYSTORE
 from fastapi.params import Body
 import requests
 from bs4 import BeautifulSoup
@@ -127,7 +127,7 @@ def get_google_ratings_and_reviews(data: NAME):
         "Reviews": votes,
         "Status": webpage.status_code
     }
-
+    
     return google_business_data
 
 @app.post("/trademark-details")
@@ -224,3 +224,44 @@ def get_trademark_details(data: TRADEMARK):
             })
 
     return trademark_data
+
+@app.post("/appstore-ratings-and_reviews")
+def get_appstore_data(data:APPSTORE):
+
+    data = data.dict()
+    appstore_page = requests.get(data["url"], timeout=15)
+    soup = BeautifulSoup(appstore_page.content, "html.parser")
+
+    average_rating = soup.find("span", class_="we-customer-ratings__averages__display")
+    if average_rating is not None:
+        average_rating = average_rating.text
+
+    total_num_ratings = soup.find("div", class_="we-customer-ratings__count small-hide medium-show")
+    if total_num_ratings is not None:
+        total_num_ratings = total_num_ratings.text
+
+    return {
+        "average_rating": average_rating,
+        "total_num_ratings": total_num_ratings,
+    }
+
+
+@app.post("/playstore-ratings-and_reviews")
+def get_playstore_data(data:PLAYSTORE):
+    data = data.dict()
+
+    playstore_page = requests.get(data["url"], timeout=15)
+    soup = BeautifulSoup(playstore_page.content, "html.parser")
+
+    average_rating = soup.find("div", class_="K9wGie")
+    if average_rating is not None:
+        average_rating = average_rating.div.text
+
+    total_num_ratings = soup.find("span", class_="AYi5wd TBRnV")
+    if total_num_ratings is not None:
+        total_num_ratings = total_num_ratings.span.text
+
+    return {
+        "average_rating": average_rating,
+        "total_num_ratings": total_num_ratings,
+    }

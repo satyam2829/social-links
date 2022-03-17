@@ -10,3 +10,9 @@ class NAME(BaseModel):
 class TRADEMARK(BaseModel):
     company_name: str
     company_cin: str
+
+class APPSTORE(BaseModel):
+    url: str
+
+class PLAYSTORE(BaseModel):
+    url: str
