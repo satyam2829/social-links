@@ -16,3 +16,7 @@ class APPSTORE(BaseModel):
 
 class PLAYSTORE(BaseModel):
     url: str
+
+class LIGHTHOUSE(BaseModel):
+    website: str
+    version: str

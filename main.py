@@ -3,11 +3,12 @@ from fastapi.responses import StreamingResponse
 from io import StringIO
 import uvicorn
 import pandas as pd
-from basemodel import URL, NAME, TRADEMARK, APPSTORE, PLAYSTORE
+from basemodel import URL, NAME, TRADEMARK, APPSTORE, PLAYSTORE, LIGHTHOUSE
 from fastapi.params import Body
 import requests
 from bs4 import BeautifulSoup
 import re
+import json
 
 app = FastAPI()
 
@@ -15,8 +16,8 @@ app = FastAPI()
 async def root():
     return {"message": "Welcome to my API"}
 
-@app.post("/sociallinks")
-def get_social_media_links(data:URL):
+@app.post("/website-details")
+def get_website_details(data:URL):
     data = data.dict()
     facebook_url = None
     linkedin_url = None
@@ -27,6 +28,8 @@ def get_social_media_links(data:URL):
     github_url = None
     whatsapp_url = None
     status_code = None
+    playstore_url = None
+    appstore_url = None
     cin = list()
     gstin = list()
     email = list()
@@ -63,6 +66,12 @@ def get_social_media_links(data:URL):
         if "wa.me/" in link:
             whatsapp_url = link
 
+        if "play.google.com" in link:
+            playstore_url = link
+
+        if "apps.apple.com" in link:
+            appstore_url = link
+
         cin_regex = r"([A-Z]{1}\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})"
         cin = list(set(re.findall(cin_regex, webpage.text)))
 
@@ -88,6 +97,8 @@ def get_social_media_links(data:URL):
         "Whatsapp": whatsapp_url,
         "ProductHunt": producthunt_url,
         "GitHub": github_url,
+        "PlayStore": playstore_url,
+        "AppStore": appstore_url,
         "CIN": cin,
         "GSTIN": gstin,
         "Email": email,
@@ -265,3 +276,109 @@ def get_playstore_data(data:PLAYSTORE):
         "average_rating": average_rating,
         "total_num_ratings": total_num_ratings,
     }
+
+def __get_light_house_data__(light_house_results):
+    light_house_data = dict()
+    performance_score = None
+    accessibility_score = None
+    best_practices_score = None
+    pwa_score = None
+    seo_score = None
+
+    _categories = light_house_results.get("categories")
+    if _categories is not None:
+        performance = _categories.get("performance")
+        if performance is not None:
+            performance_score = performance.get("score")
+            if performance_score is not None:
+                performance_score = round(performance_score * 100)
+
+        accessibility = _categories.get("accessibility")
+        if accessibility is not None:
+            accessibility_score = accessibility.get("score")
+            if accessibility_score is not None:
+                accessibility_score = round(accessibility_score * 100)
+
+        best_practices = _categories.get("best-practices")
+        if best_practices is not None:
+            best_practices_score = best_practices.get("score")
+            if best_practices_score is not None:
+                best_practices_score = round(best_practices_score * 100)
+
+        pwa = _categories.get("pwa")
+        if pwa is not None:
+            pwa_score = pwa.get("score")
+            if pwa_score is not None:
+                pwa_score = round(pwa_score * 100)
+
+            seo = _categories.get("seo")
+            if seo is not None:
+                seo_score = seo.get("score")
+                if seo_score is not None:
+                    seo_score = round(seo_score * 100)
+
+    light_house_data.update(
+        {
+                "performance": performance_score,
+                "accessibility": accessibility_score,
+                "best_practices": best_practices_score,
+                "pwa": pwa_score,
+                "seo": seo_score,
+        }
+    )
+    return light_house_data
+
+@app.post("/lighthouse-results")
+def get_light_house_results(data:LIGHTHOUSE):
+    light_house_results = dict()
+
+    data = data.dict()
+
+    api_key = "AIzaSyDIFMcvo9kDayhTRGZgyyAEmzpMSdhtK5M"
+    service_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+
+    parameters = {
+            "url": data["website"],
+            "key": api_key,
+            "strategy": data["version"],
+            "category": [
+                "PERFORMANCE",
+                "ACCESSIBILITY",
+                "BEST_PRACTICES",
+                "SEO",
+                "PWA",
+            ],
+        }
+    light_house_response = requests.get(service_url, params=parameters)
+
+    if light_house_response.status_code == 200:
+        response_data = json.loads(light_house_response.text)
+        response_data = response_data.get("lighthouseResult")
+
+        if response_data is not None:
+                light_house_results = __get_light_house_data__(response_data)
+    
+    light_house_results.update({"website": data["website"], "version": data["version"]})
+    return light_house_results
+
+@app.post("/llp-main-division")
+def get_llp_main_division(data:TRADEMARK):
+    data = data.dict()
+    zaubacorp_url = "https://www.zaubacorp.com/company/"
+    company_name = data["company_name"]
+    llpin = data["company_cin"]
+
+    url = zaubacorp_url + company_name + "/" + llpin
+
+    table = pd.read_html(url)[0]
+    main_division = table.iloc[3, 1]
+    main_division_description = table.iloc[4, 1]
+
+    main_division_results = {
+        "Company": table.iloc[0,1],
+        "LLPIN": llpin,
+        "Main Division": main_division,
+        "Description of Main Division": main_division_description
+    }
+
+    return main_division_results
